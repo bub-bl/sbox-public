@@ -50,7 +50,14 @@ class LoadContext : AssemblyLoadContext
 		{
 			var childAsmName = child.Assembly.GetName();
 
-			if ( childAsmName.Name != assemblyName.Name )
+			if ( !string.Equals( childAsmName.Name, assemblyName.Name, StringComparison.OrdinalIgnoreCase ) )
+			{
+				continue;
+			}
+
+			// A full hotload creates a new assembly version. Don't bind a dependent
+			// assembly to the previous version just because its simple name matches.
+			if ( assemblyName.Version is not null && childAsmName.Version != assemblyName.Version )
 			{
 				continue;
 			}
