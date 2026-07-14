@@ -76,7 +76,17 @@ class LoadContext : AssemblyLoadContext
 		if ( root is not null )
 		{
 			var rootContext = GetLoadContext( root );
-			var asm = rootContext?.LoadFromAssemblyName( assemblyName ) ?? default;
+			Assembly asm = null;
+
+			try
+			{
+				asm = rootContext?.LoadFromAssemblyName( assemblyName );
+			}
+			catch ( FileNotFoundException )
+			{
+				// The root context couldn't resolve this assembly. Continue through our
+				// package resolver before falling back to the default probing behavior.
+			}
 
 			if ( asm is not null )
 			{
