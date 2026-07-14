@@ -659,6 +659,12 @@ internal sealed partial class PackageLoader : IDisposable
 				return true;
 			}
 
+			if ( IncomingThisHotload.Any( x => x.Name.Equals( asmRefName.Name, StringComparison.OrdinalIgnoreCase ) ) )
+			{
+				log.Trace( $"Can't fast hotload, referenced assembly {asmRefName} was fully hotloaded" );
+				return true;
+			}
+
 			if ( oldRefName.Version.CompareTo( asmRefName.Version ) == 0 )
 			{
 				// Referenced version hasn't changed
