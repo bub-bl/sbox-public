@@ -104,9 +104,24 @@ static class StartupLoadProject
 		CurrentStep = 0;
 		TotalSteps = 16;
 
-		// should never be one existing once we remove all this shit
+		var projectList = new ProjectList();
+		var projectEntry = projectList.TryAddFromFile( path );
+		var parentPackage = projectEntry?.Config.GetMetaOrDefault<string>( "ParentPackage", null );
+		Project localParentProject = null;
+
+		if ( projectEntry?.Config.Type == "addon" && !string.IsNullOrWhiteSpace( parentPackage ) )
+		{
+			var knownParent = ProjectList.FindLocalGame( projectList.GetAll(), parentPackage );
+			if ( knownParent is not null )
+			{
+				localParentProject = Project.AddFromFile( knownParent.ConfigFilePath, true );
+				parentPackage = localParentProject.Package.FullIdent;
+				Log.Info( $"Using local parent package {parentPackage} ({localParentProject.GetRootPath()})" );
+			}
+		}
+
+		// Add the edited project after its local parent so its files take precedence in aggregate mounts.
 		Project project = Project.AddFromFile( path, false );
-		var parentPackage = project.Config.GetMetaOrDefault<string>( "ParentPackage", null );
 
 		Step( "Initializing filesystem" );
 		using ( var _ = Bootstrap.StartupTiming?.ScopeTimer( $"Load Project: Init FileSystem" ) )
@@ -207,9 +222,12 @@ static class StartupLoadProject
 			// Install it as the active game
 			await GameInstanceDll.Current.LoadGamePackageAsync( parentPackage, GameLoadingFlags.Host | GameLoadingFlags.Reload, ct );
 
-			Log.Info( $"AssetSystem.InstallAsync" );
-			// Install into asset system so we can use prefabs, gameresources, etc.
-			await AssetSystem.InstallAsync( parentPackage, false );
+			if ( localParentProject is null )
+			{
+				Log.Info( $"AssetSystem.InstallAsync" );
+				// Install remote parent assets into the editor's cloud filesystem.
+				await AssetSystem.InstallAsync( parentPackage, false );
+			}
 
 			Log.Info( $"MountAsync" );
 			// Mount our current project, and load the source!

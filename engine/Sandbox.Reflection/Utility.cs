@@ -79,7 +79,9 @@ internal static class ReflectionUtility
 						continue;
 					}
 
-					if ( !TryClearCollectionOfType( field.GetValue( null ), targetType ) ) continue;
+					var value = field.GetValue( null );
+					if ( TryResetImmutableArray( field, value, targetType ) ) continue;
+					if ( !TryClearCollectionOfType( value, targetType ) ) continue;
 				}
 				catch ( Exception e )
 				{
@@ -150,6 +152,31 @@ internal static class ReflectionUtility
 		}
 
 		return false;
+	}
+
+	/// <summary>
+	/// Immutable arrays implement collection interfaces but cannot be cleared through them. Replace a
+	/// writable static field with <c>ImmutableArray&lt;T&gt;.Empty</c> instead. Default immutable arrays are
+	/// handled here too because accessing their collection <c>Count</c> throws.
+	/// </summary>
+	private static bool TryResetImmutableArray( FieldInfo field, object value, Type targetType )
+	{
+		if ( value is null ) return false;
+
+		var valueType = value.GetType();
+		if ( !valueType.IsGenericType || valueType.GetGenericTypeDefinition() != typeof( System.Collections.Immutable.ImmutableArray<> ) )
+			return false;
+
+		if ( !targetType.IsAssignableFrom( valueType.GetGenericArguments()[0] ) )
+			return false;
+
+		// Readonly immutable arrays cannot be replaced safely, but they must not fall through to IList.
+		if ( field.IsInitOnly )
+			return true;
+
+		var empty = valueType.GetField( "Empty", BindingFlags.Public | BindingFlags.Static )?.GetValue( null );
+		field.SetValue( null, empty );
+		return true;
 	}
 
 	/// <summary>

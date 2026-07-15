@@ -33,6 +33,24 @@ public class ProjectList
 	public IEnumerable<Project> GetAll() => All;
 
 	/// <summary>
+	/// Find the most recently opened local game matching a package ident.
+	/// </summary>
+	internal static Project FindLocalGame( IEnumerable<Project> projects, string packageIdent )
+	{
+		if ( !Package.TryParseIdent( packageIdent, out var parsedIdent ) )
+			return null;
+
+		var fullIdent = Package.FormatIdent( parsedIdent.org, parsedIdent.package );
+
+		return projects
+			.Where( x => !x.Broken )
+			.Where( x => string.Equals( x.Config?.Type, "game", StringComparison.OrdinalIgnoreCase ) )
+			.Where( x => string.Equals( x.Config?.FullIdent, fullIdent, StringComparison.OrdinalIgnoreCase ) )
+			.OrderByDescending( x => x.LastOpened )
+			.FirstOrDefault();
+	}
+
+	/// <summary>
 	/// Remove an item from the list. This doesn't save the changes.
 	/// </summary>
 	public bool Remove( Project item )
